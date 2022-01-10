@@ -1,15 +1,20 @@
-#include "ledbuzz.h"
-#include "pitches.h"
+#include "led.h"
+#include "tone.h"
 
-float sleep = 10; //milliseconds
+float sleep; //milliseconds
 int pot_reading = 0; //potentiometer reading
 float buzz_baby_shark_sleep = 0; //delay between tone and no tone
 int knight_ride_times = 3; //number of times LED go back and forth
-const int duty1 = 255; //analog duty 
-const int duty2 = 80; //analog duty 
-const int duty3 = 15; //analog duty 
-const int led_array[NUM_LED] = {3,5,6,9,10,11}; //i/o pins led array 
-const int motion_array[KNIGHT_MOTION] = {2,2,3,5,6,9,10,11,2,2}; //i/o pins with 2 placeholders in front and back (dummy)
+const float sleep_min = 100; //min sleep for LED
+const float sleep_max =  1500; //max sleep for LED
+const float buzz_sleep_min = 1.0; //min sleep for baby shark
+const float buzz_sleep_max =  2.0; //max sleep for baby shark
+const float no_tone_sleep = 75; //no tone delay between notes
+const int duty1 = 255; //maximum brightness
+const int duty2 = 120; //mid-brightness
+const int duty3 = 50; //dim/minimum brightness
+const int led_array[NUM_LED] = {7,6,5,4,3,2}; //i/o pins led array 
+const int motion_array[KNIGHT_MOTION] = {1,1,7,6,5,4,3,2,1,1}; //i/o pins with 2 placeholders in front and back (dummy)
 const int song_notes[] =
   {
     NOTE_D4, NOTE_E4, NOTE_G4, NOTE_G4, 
@@ -49,40 +54,54 @@ void loop()
 }
 
 /**
-   * @brief  knight rider LED program runs back anf forth 'knight_rider_times'
+   * @brief  knight rider LED program runs back and forth 'knight_rider_times'
    */
 void knight_rider()
 { 
   while (knight_ride_times>0)
   {
     // Forward Knight Rider
-    for (int i=KNIGHT_LED; i<=KNIGHT_MOTION-KNIGHT_LED; i++)
+    for (int i=KNIGHT_LED-1; i<=KNIGHT_MOTION-KNIGHT_LED; i++)
     {
       read_potentiometer();
+      knight_rider_led_clear();
       analogWrite(motion_array[i], duty1);
-      delay(sleep);
       analogWrite(motion_array[i-1], duty2);
-      delay(sleep);
       analogWrite(motion_array[i-2], duty3);
       delay(sleep);
     }
 
+    knight_rider_led_clear();
+
     // Backward Knight Rider
-    for (int j=KNIGHT_MOTION-KNIGHT_LED-1; j>=KNIGHT_LED-1; j--)
+    for (int j=KNIGHT_MOTION-KNIGHT_LED; j>=KNIGHT_LED-1; j--)
     {
       read_potentiometer();
       analogWrite(motion_array[j], duty1);   
-      delay(sleep);
       analogWrite(motion_array[j+1], duty2);
-      delay(sleep);
       analogWrite(motion_array[j+2], duty3);
       delay(sleep);
+      knight_rider_led_clear();
     }
     
     knight_ride_times--;
   }
+
+  knight_rider_led_clear();
   
   knight_ride_times=3;
+}
+
+/**
+   * @brief  set all LED's to zero
+   */
+void knight_rider_led_clear()
+{
+  //Set all LED's to 0 brightness
+  for (int k=0; k<NUM_LED; k++)
+  {
+    analogWrite(led_array[k], 0); 
+  }
 }
 
 /**
@@ -91,8 +110,8 @@ void knight_rider()
 void read_potentiometer()
 {
   pot_reading = analogRead(POT_PIN);
-  sleep = map(pot_reading, 0, 1024, 10, 50);
-  buzz_baby_shark_sleep = map(pot_reading, 0, 1024, 1.5, 3.0);
+  sleep = sleep_min + (pot_reading*((sleep_max-sleep_min)/1024)); //sleep_min - sleep_max
+  buzz_baby_shark_sleep = buzz_sleep_min + (pot_reading*((buzz_sleep_max-buzz_sleep_min)/1024));  
 }
 
 /**
@@ -103,10 +122,11 @@ void buzz_baby_shark()
   for (int note = 0; note < 30; note++) 
   {
     read_potentiometer();
-	int note_duration = 1000 / note_durations[note];
+	  int note_duration = 1000 / note_durations[note];
     tone(BUZZ_PIN, song_notes[note], note_duration);
-    int sleep = note_duration * buzz_baby_shark_sleep;
-    delay(sleep);
+    int sleep_tone = note_duration * buzz_baby_shark_sleep;
+    delay(sleep_tone);
     noTone(BUZZ_PIN);
+    delay(no_tone_sleep);
   }
-}
+} 
